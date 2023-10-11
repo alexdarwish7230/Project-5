@@ -1,0 +1,208 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <xc.h>
+#include <math.h>
+#include <p18f4620.h>
+
+#pragma config OSC = INTIO67
+#pragma config WDT = OFF
+#pragma config LVP = OFF
+#pragma config BOREN = OFF
+
+#define EWLT_RED PORTAbits.RA5                                                  // define a pin to a certain bit of a port
+#define EWLT_GREEN PORTCbits.RC0
+#define EW_RED PORTEbits.RE1
+#define EW_GREEN PORTEbits.RE2
+#define NS_RED PORTCbits.RC2
+#define NS_GREEN PORTCbits.RC3
+#define NSLT_RED PORTCbits.RC4
+#define NSLT_GREEN PORTCbits.RC5
+#define SEC_LED PORTEbits.RE0
+#define OFF 0
+#define RED 1
+#define GREEN 2
+#define YELLOW 3
+
+void Flash_LED(unsigned DO_DISPLAYint);                                         // Start of Function Prototyping Area
+void DO_DISPLAY_7SEG_Upper(char);
+void DO_DISPLAY_7SEG_Lower(char);
+void DO_DISPLAY_D1(int);
+void DO_DISPLAY_D2(int);
+void DO_DISPLAY_D3(double);
+void Wait_N_Seconds (char);
+char array[10] = {0x01,0x4F,0x12,0x06,0x4C,0x24,0x20,0x0F,0x00,0x04};           //Array for 7-SEG
+char array2[8] = {0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07};                     // Array of number of colors
+
+
+void DO_DISPLAY_7SEG_Upper(char digit){                                         // Create void function to call upon it later to execute any statements made inside of the void 
+                                
+    PORTB = array[digit];                                                       // Set PORTB equal to array of a the char digit
+}
+
+void DO_DISPLAY_7SEG_Lower(char digit){                                         // Create void function to call upon it later to execute any statements made inside of the void 
+    PORTD=array[digit];                                                         // Set PORTB equal to array of a the char digit
+}
+
+unsigned int get_full_ADC(void)
+{
+    int result;                                                                 // Create integer variable 'result'
+    ADCON0bits.GO=1;                                                            // Start Conversion
+    while(ADCON0bits.DONE==1){                                                  // wait for conversion to be completed
+    result = (ADRESH * 0x100) + ADRESL;                                         // combine result of upper byte and
+    }                                                                           // lower byte into result
+     return result;                                                             // return the result.
+} 
+
+void Set_ADCON0 (char AN_pin)                                                   // Create void function to call upon it later to execute any statements made inside of the void 
+{
+ ADCON0 = AN_pin * 4 + 1;                                                       // Set ADCON0 equal to AN_pin times four plus one
+} 
+
+void Init_ADC(void)
+{
+    
+ADCON0=0x03;                                                                    // select channel AN0, and turn on the ADC subsystem            
+ ADCON1=0x0E;                                                                   // select pins AN0 through AN3 as analog signal, VDD-VSS as
+                                                                                // reference voltage
+ ADCON2=0xA9;                                                                   // Set the bit conversion time (TAD) and acquisition time
+                                                                                
+} 
+
+void putch (char c)                                                             // Given
+{
+ while (!TRMT);
+ TXREG = c;
+}
+void Init_UART()                                                                // Given
+{
+ OpenUSART (USART_TX_INT_OFF & USART_RX_INT_OFF &
+USART_ASYNCH_MODE & USART_EIGHT_BIT & USART_CONT_RX &
+USART_BRGH_HIGH, 25);
+ OSCCON = 0x60;
+} 
+
+
+void Wait_Half_Second()
+{
+ T0CON = 0x02;                                                                  // Timer 0, 16-bit mode, prescaler 1:8
+ TMR0L = 0xDB;                                                                  // set the lower byte of TMR
+ TMR0H = 0x0B;                                                                  // set the upper byte of TMR
+ INTCONbits.TMR0IF = 0;                                                         // clear the Timer 0 flag
+ T0CONbits.TMR0ON = 1;                                                          // Turn on the Timer 0
+ while (INTCONbits.TMR0IF == 0);                                                // wait for the Timer Flag to be 1 for done
+ T0CONbits.TMR0ON = 0;                                                          // turn off the Timer 0
+} 
+void Wait_One_Second()
+{
+ SEC_LED = 1;                                                                   // First, turn on the SEC LED
+ Wait_Half_Second();                                                            // Wait for half second (or 500 msec)
+ SEC_LED = 0;                                                                   // then turn off the SEC LED
+ Wait_Half_Second();                                                            // Wait for half second (or 500 msec)
+}
+void Wait_N_Seconds (char seconds)
+{
+char I;
+ for (I = 0; I< seconds; I++)
+ {
+ Wait_One_Second();
+ }
+} 
+
+void Set_EW(char color)
+{
+ switch (color)
+ {
+ case OFF: EW_RED =0;EW_GREEN=0;break;                                          // Turns off the EW LED
+ case RED: EW_RED =1;EW_GREEN=0;break;                                          // Sets EW LED RED
+ case GREEN: EW_RED =0;EW_GREEN=1;break;                                        // sets EW LED GREEN
+ case YELLOW: EW_RED =1;EW_GREEN=1;break;                                       // sets EW LED YELLOW
+ }
+} 
+
+void Set_EWLT(char color) {
+    switch (color)
+    {
+ case OFF: EWLT_RED =0;EWLT_GREEN=0;break;                                      // Turns off the EW LED
+ case RED: EWLT_RED =1;EWLT_GREEN=0;break;                                      // Sets EW LED RED
+ case GREEN: EWLT_RED =0;EWLT_GREEN=1;break;                                    // sets EW LED GREEN
+case YELLOW: EWLT_RED =1;EWLT_GREEN=1;break;                                    // sets EW LED YELLOW
+    }
+}
+void Set_NS(char color){
+    switch (color)
+ {
+ case OFF: NS_RED =0;NS_GREEN=0;break;                                          // Turns off the EW LED
+ case RED: NS_RED =1;NS_GREEN=0;break;                                          // Sets EW LED RED
+ case GREEN: NS_RED =0;NS_GREEN=1;break;                                        // sets EW LED GREEN
+ case YELLOW: NS_RED =1;NS_GREEN=1;break;                                       // sets EW LED YELLOW
+ }
+}
+void Set_NSLT(char color){
+    switch (color)
+ {
+ case OFF: NSLT_RED =0;NSLT_GREEN=0;break;                                      // Turns off the EW LED
+ case RED: NSLT_RED =1;NSLT_GREEN=0;break;                                      // Sets EW LED RED
+ case GREEN: NSLT_RED =0;NSLT_GREEN=1;break;                                    // sets EW LED GREEN
+ case YELLOW: NSLT_RED =1;NSLT_GREEN=1;break;                                   // sets EW LED YELLOW
+ }
+}
+
+void Wait_One_Second_With_Beep()
+{
+ SEC_LED = 1;                                                                   // First, turn on the SEC LED
+Activate_Buzzer()                                                               // Activate the buzzer
+ Wait_Half_Second();                                                            // Wait for half second (or 500 msec)
+ SEC_LED = 0;                                                                   // then turn off the SEC LED
+ Deactivate_ Buzzer ();                                                         // Deactivate the buzzer
+ Wait_Half_Second();                                                            // Wait for half second (or 500 msec)
+} 
+
+void PED_Control( char Direction, char Num_Sec){                                // Controls the pedestrian counter
+                                                                                // Sets the direction with the required direction
+                                                                                // then sets the number of second needed to do the pedestrian control
+    
+    if(Direction == 0){                                                         
+        Set_NS();
+        for (char i = Num_Sec/*-1*/;Num_Sec>=0;Num_Sec--){
+           
+           DO_DISPLAY_7SEG_Upper(Num_Sec-1);                                    // decrement upper 7-seg and show 1 less then it calls for
+           Wait_N_Seconds(1);
+          
+       }
+    }
+    else if (Direction == 1){
+        Set_EW();
+         for (char i = Num_Sec/*-1*/;Num_Sec>=0;Num_Sec--){
+           DO_DISPLAY_7SEG_Lower(Num_Sec-1);                                    // decrement lower 7-seg and show 1 less then it calls for
+           Wait_N_Seconds(1);           
+          
+    }
+     Wait_One_Second_With_Beep();
+    
+}
+}
+
+void main(void){
+ while(1){
+   TRISA=0xDF;                                                                  // Set TRISA equal to 0xDF
+    TRISB=0x00;                                                                 // Set TRISB equal to 0x00
+    TRISC=0x00;                                                                 // Set TRISC equal to 0x00
+    TRISD=0x00;                                                                 // Set TRISD equal to 0x00
+    TRISE=0x00; // call statement
+    Set_ADCON0(0);                                                              // call statements within function Set_ADCON0(0)
+     Init_UART();                                                               // call statements within function Init_UART()
+    Init_ADC();   
+  
+
+    for(int i = 0; i < 4; i++)
+    {
+        Set_EW(i);                                                              // Set color for East-West direction
+        Set_EWLT(i);                                                            // Set color for East-West Left-Turn direction
+        Set_NS(i);                                                              // Set color for North-South direction
+        Set_NSLT(i);                                                            // Set color for North-South Left-Turn direction
+        Wait_N_Seconds(1);                                                      // call Wait-N-Second routine to wait for 1 second
+    } 
+   
+        
+ }
+}
